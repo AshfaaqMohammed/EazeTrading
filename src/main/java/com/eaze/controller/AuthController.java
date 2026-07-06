@@ -1,6 +1,7 @@
 package com.eaze.controller;
 
 import com.eaze.model.User;
+import com.eaze.response.AuthResponse;
 import com.eaze.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -18,13 +19,13 @@ public class AuthController {
     private UserService userService;
 
     @PostMapping("/signup")
-    public ResponseEntity<User> register(
+    public ResponseEntity<AuthResponse> register(
             @RequestBody
             User user
-    ){
+    ) throws Exception {
 
-        User savedUser = userService.register(user);
-        return new ResponseEntity<>(savedUser, HttpStatus.CREATED);
+        AuthResponse response = userService.register(user);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
 
     }
 
