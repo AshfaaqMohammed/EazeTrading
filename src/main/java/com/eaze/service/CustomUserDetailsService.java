@@ -15,12 +15,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-//need to implement this, so that spring security will consider this as default user creds, know more on google.
+//need to implement this, so that spring security will consider this as default user creds, know more on Google.
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final Logger LOG = LoggerFactory.getLogger(CustomUserDetailsService.class);
 
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
     public CustomUserDetailsService(UserRepository userRepository){
         this.userRepository = userRepository;
