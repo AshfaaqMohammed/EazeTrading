@@ -1,4 +1,4 @@
-package com.eaze.service;
+package com.eaze.service.domain;
 
 import com.eaze.model.TwoFactorOTP;
 import com.eaze.model.User;

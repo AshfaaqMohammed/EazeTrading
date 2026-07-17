@@ -3,13 +3,14 @@ package com.eaze.service;
 import com.eaze.model.TwoFactorOTP;
 import com.eaze.model.User;
 import com.eaze.repository.TwoFactorOtpRepository;
+import com.eaze.service.domain.TwoFactorOTPService;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
-public class TwoFactorOtpServiceImpl implements TwoFactorOTPService{
+public class TwoFactorOtpServiceImpl implements TwoFactorOTPService {
 
     private final TwoFactorOtpRepository twoFactorOtpRepository;
 

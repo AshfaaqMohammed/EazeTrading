@@ -1,4 +1,4 @@
-package com.eaze.model.dto;
+package com.eaze.request;
 
 import lombok.Data;
 

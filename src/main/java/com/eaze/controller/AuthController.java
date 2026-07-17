@@ -1,7 +1,7 @@
 package com.eaze.controller;
 
 import com.eaze.model.User;
-import com.eaze.model.dto.UserLoginRequest;
+import com.eaze.request.UserLoginRequest;
 import com.eaze.response.AuthResponse;
 import com.eaze.service.AuthService;
 import org.springframework.http.HttpStatus;
@@ -40,6 +40,7 @@ public class AuthController {
 
     }
 
+    @PostMapping("/two-factor/otp/{otp}")
     public ResponseEntity<AuthResponse> verifyLoginOtp(
             @PathVariable String otp,
             @RequestParam String id) throws Exception {
