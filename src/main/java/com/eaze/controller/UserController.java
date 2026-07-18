@@ -10,7 +10,6 @@ import com.eaze.response.ApiResponse;
 import com.eaze.response.AuthResponse;
 import com.eaze.service.EmailService;
 import com.eaze.service.domain.ForgotPasswordService;
-import com.eaze.service.domain.TwoFactorOTPService;
 import com.eaze.service.domain.UserService;
 import com.eaze.service.domain.VerificationCodeService;
 import com.eaze.utils.OtpUtils;
