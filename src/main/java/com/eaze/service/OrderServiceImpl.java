@@ -2,15 +2,14 @@ package com.eaze.service;
 
 import com.eaze.domian.OrderStatus;
 import com.eaze.domian.OrderType;
-import com.eaze.model.Coin;
-import com.eaze.model.Order;
-import com.eaze.model.OrderItem;
-import com.eaze.model.User;
+import com.eaze.model.*;
 import com.eaze.repository.OrderItemRepository;
 import com.eaze.repository.OrderRepository;
+import com.eaze.service.domain.AssetService;
 import com.eaze.service.domain.OrderService;
 import com.eaze.service.domain.WalletService;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -19,17 +18,13 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final WalletService walletService;
     private final OrderItemRepository orderItemRepository;
-
-    public OrderServiceImpl(OrderRepository orderRepository, WalletService walletService, OrderItemRepository orderItemRepository) {
-        this.orderRepository = orderRepository;
-        this.walletService = walletService;
-        this.orderItemRepository = orderItemRepository;
-    }
+    private final AssetService assetService;
 
     @Override
     public Order createOrder(User user, OrderItem orderItem, OrderType orderType) {
@@ -97,7 +92,14 @@ public class OrderServiceImpl implements OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // TODO: create asset
+        Asset oldAsset = assetService.findAssetByUserIdAndCoinId(order.getUser().getId(), order.getOrderItem().getCoin().getId());
+
+        if (oldAsset == null) {
+            assetService.createAsset(user,orderItem.getCoin(),orderItem.getQuantity());
+        }else {
+            assetService.updateAsset(oldAsset.getId(), quantity);
+        }
+
         return savedOrder;
     }
 
@@ -108,16 +110,29 @@ public class OrderServiceImpl implements OrderService {
         }
 
         double sellPrice = coin.getCurrentPrice();
-        OrderItem orderItem = createOrderItem(coin, quantity, 0, sellPrice);
-        Order order = createOrder(user, orderItem, OrderType.SELL);
-        orderItem.setOrder(order);
 
-        walletService.payOrderPayment(order, user);
-        order.setOrderStatus(OrderStatus.SUCCESS);
+        Asset assetToSell = assetService.findAssetByUserIdAndCoinId(user.getId(), coin.getId());
 
-        Order savedOrder = orderRepository.save(order);
+        if (assetToSell!=null) {
+            double buyPrice = assetToSell.getBuyPrice();
+            OrderItem orderItem = createOrderItem(coin, quantity, buyPrice, sellPrice);
+            Order order = createOrder(user, orderItem, OrderType.SELL);
+            orderItem.setOrder(order);
 
-        //TODO create asset (5:53:00)
-        return savedOrder;
+            if (assetToSell.getQuantity() >= quantity) {
+                order.setOrderStatus(OrderStatus.SUCCESS);
+                Order savedOrder = orderRepository.save(order);
+                walletService.payOrderPayment(order, user);
+
+                Asset updatedAsset = assetService.updateAsset(assetToSell.getId(), -quantity);
+                if (updatedAsset.getQuantity() * coin.getCurrentPrice() <= 1) {
+                    assetService.deleteAsset(updatedAsset.getId());
+                }
+                return savedOrder;
+            }
+            throw new Exception("Insufficient quantity to sell");
+        }
+        throw new Exception("Asset not found");
+
     }
 }

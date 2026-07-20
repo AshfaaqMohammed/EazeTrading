@@ -7,23 +7,19 @@ import com.eaze.model.WalletTransaction;
 import com.eaze.service.domain.OrderService;
 import com.eaze.service.domain.UserService;
 import com.eaze.service.domain.WalletService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("api/wallet")
+@RequiredArgsConstructor
 public class WalletController {
 
     private final UserService userService;
     private final WalletService walletService;
     private final OrderService orderService;
-
-    public WalletController(UserService userService, WalletService walletService, OrderService orderService) {
-        this.userService = userService;
-        this.walletService = walletService;
-        this.orderService = orderService;
-    }
 
     @GetMapping
     public ResponseEntity<Wallet> getUserWallet(@RequestHeader("Authorization") String jwt) throws Exception {

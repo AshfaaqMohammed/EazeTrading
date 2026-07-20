@@ -8,7 +8,6 @@ import com.eaze.repository.WalletRepository;
 import com.eaze.service.domain.WalletService;
 import org.springframework.stereotype.Service;
 
-import javax.swing.text.html.Option;
 import java.math.BigDecimal;
 import java.util.Optional;
 
@@ -16,11 +15,9 @@ import java.util.Optional;
 public class WalletServiceImpl implements WalletService {
 
     private final WalletRepository walletRepository;
-    private final WalletService walletService;
 
-    public WalletServiceImpl(WalletRepository walletRepository, WalletService walletService) {
+    public WalletServiceImpl(WalletRepository walletRepository) {
         this.walletRepository = walletRepository;
-        this.walletService = walletService;
     }
 
     @Override
