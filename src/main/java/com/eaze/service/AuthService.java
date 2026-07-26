@@ -7,7 +7,9 @@ import com.eaze.request.UserLoginRequest;
 import com.eaze.repository.UserRepository;
 import com.eaze.response.AuthResponse;
 import com.eaze.service.domain.TwoFactorOTPService;
+import com.eaze.service.domain.WatchListService;
 import com.eaze.utils.OtpUtils;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -16,20 +18,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
     private final CustomUserDetailsService customUserDetailsService;
     private final TwoFactorOTPService twoFactorOTPService;
     private final EmailService emailService;
+    private final WatchListService watchListService;
 
-    public AuthService(UserRepository userRepository, CustomUserDetailsService customUserDetailsService,
-                       TwoFactorOTPService twoFactorOTPService, EmailService emailService){
-        this.userRepository = userRepository;
-        this.customUserDetailsService = customUserDetailsService;
-        this.twoFactorOTPService = twoFactorOTPService;
-        this.emailService = emailService;
-    }
 
     public AuthResponse register(User user) throws Exception {
 
@@ -43,7 +40,9 @@ public class AuthService {
         newUser.setPassword(user.getPassword());
         newUser.setEmail(user.getEmail());
 
-        userRepository.save(newUser);
+        User savedUser = userRepository.save(newUser);
+
+        watchListService.createWatchList(savedUser);
 
         Authentication auth = new UsernamePasswordAuthenticationToken(
                 user.getEmail(),

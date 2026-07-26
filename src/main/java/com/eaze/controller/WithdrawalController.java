@@ -1,9 +1,11 @@
 package com.eaze.controller;
 
+import com.eaze.domian.WalletTransactionType;
 import com.eaze.model.User;
 import com.eaze.model.Wallet;
 import com.eaze.model.WalletTransaction;
 import com.eaze.model.Withdrawal;
+import com.eaze.service.TransactionService;
 import com.eaze.service.domain.UserService;
 import com.eaze.service.domain.WalletService;
 import com.eaze.service.domain.WithdrawalService;
@@ -12,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -22,6 +25,7 @@ public class WithdrawalController {
     private final WithdrawalService withdrawalService;
     private final WalletService walletService;
     private final UserService userService;
+    private final TransactionService transactionService;
 
     @PostMapping("/api/withdrawal/{amount}")
     public ResponseEntity<?> withdrawalRequest(@PathVariable("amount") Long amount,
@@ -31,7 +35,15 @@ public class WithdrawalController {
         Wallet userWallet = walletService.getUserWallet(user);
 
         Withdrawal withdrawal = withdrawalService.requestWithdrawal(amount, user);
-        walletService.addBalance(userWallet, -withdrawal.getAmount());  // we are sending -ve amount, this is subtracting from the actual balance
+        walletService.addBalance(userWallet, -withdrawal.getAmount());// we are sending -ve amount, this is subtracting from the actual balance
+
+        transactionService.createTransaction(
+                userWallet,
+                WalletTransactionType.WITHDRAWAL,
+                LocalDateTime.now(),
+                null,
+                "bank account withdrawal",
+                withdrawal.getAmount());
 
         return new ResponseEntity<>(withdrawal, HttpStatus.OK);
     }

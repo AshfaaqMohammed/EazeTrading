@@ -36,7 +36,7 @@ public class UserController {
         this.forgotPasswordService = forgotPasswordService;
     }
 
-    @GetMapping("/api/users/profiles")
+    @GetMapping("/api/users/profile")
     public ResponseEntity<User> getUserProfile(
             @RequestHeader("Authorization") String jwt) throws Exception {
         User user = userService.findUserProfileByJwt(jwt);
