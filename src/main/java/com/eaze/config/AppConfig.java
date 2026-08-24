@@ -1,12 +1,18 @@
 package com.eaze.config;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
+
+import java.util.Collections;
+import java.util.List;
 
 @Configuration
 public class AppConfig {
@@ -23,6 +29,20 @@ public class AppConfig {
     }
 
     private CorsConfigurationSource corsConfigurationSource(){
-        return null;
+        return new CorsConfigurationSource() {
+            @Override
+            public @Nullable CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
+                CorsConfiguration cfg = new CorsConfiguration();
+                cfg.setAllowedOrigins(
+                        List.of("http://localhost:5173")
+                );
+                cfg.setAllowedMethods(Collections.singletonList("*"));
+                cfg.setAllowCredentials(true);
+                cfg.setExposedHeaders(List.of("Authorization"));
+                cfg.setAllowedHeaders(Collections.singletonList("*"));
+                cfg.setMaxAge(3600L);
+                return cfg;
+            }
+        };
     }
 }

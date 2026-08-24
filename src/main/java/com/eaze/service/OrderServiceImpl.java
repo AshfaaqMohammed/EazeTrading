@@ -52,7 +52,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public List<Order> getAllOrdersOfUser(Long userId, OrderType orderType, String assetSymbol) {
+    public List<Order> getAllOrdersOfUser(Long userId) {
         return orderRepository.findByUserId(userId);
     }
 

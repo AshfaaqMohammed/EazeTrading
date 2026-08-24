@@ -28,7 +28,7 @@ public class TransactionController {
     private final WalletService walletService;
 
     @GetMapping("/transactions")
-    public ResponseEntity<List<WalletTransaction>> getUserWallet(@RequestHeader("Authorization") String jwt) throws Exception {
+    public ResponseEntity<List<WalletTransaction>> getUserTransactions(@RequestHeader("Authorization") String jwt) throws Exception {
         User user = userService.findUserProfileByJwt(jwt);
         Wallet wallet = walletService.getUserWallet(user);
 

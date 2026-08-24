@@ -117,7 +117,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         paymentLinkRequest.put("reminder_enable", true);
 
-        paymentLinkRequest.put("callback_url", "http://localhost:5455/api/wallet?order_id="+orderId);
+        paymentLinkRequest.put("callback_url", "http://localhost:5173/wallet?order_id="+orderId);
         paymentLinkRequest.put("callback_method", "get");
         return paymentLinkRequest;
     }

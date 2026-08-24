@@ -3,6 +3,7 @@ package com.eaze.service;
 import com.eaze.model.Coin;
 import com.eaze.repository.CoinRepository;
 import com.eaze.service.domain.CoinService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -26,53 +27,65 @@ public class CoinServiceImpl implements CoinService {
     private final CoinRepository coinRepository;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
+    @Value("${coingecko.api.key}")
+    private String apiKey;
+
+    @Value("${coingecko.api.base-url}")
+    private String baseUrl;
+
+    @Value("${coingecko.api.header-name}")
+    private String headerName;
+
     public CoinServiceImpl(CoinRepository coinRepository) {
         this.coinRepository = coinRepository;
     }
 
+    private HttpEntity<String> createHttpEntity() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(headerName, apiKey);
+        return new HttpEntity<>("parameters", headers);
+    }
+
     @Override
     public List<Coin> getCoinList(int page) throws Exception {
-        String url = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=10&page="+page;
+        String url = baseUrl + "/coins/markets?vs_currency=usd&per_page=10&page=" + page;
 
         RestTemplate restTemplate = new RestTemplate();
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            HttpEntity<String> entity = new HttpEntity<String>("parameters",headers);
+            HttpEntity<String> entity = createHttpEntity();
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
             List<Coin> coinList = objectMapper.readValue(response.getBody(), new TypeReference<List<Coin>>() {});
 
             return coinList;
-        }catch (HttpClientErrorException | HttpServerErrorException e) {
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
             throw new Exception(e.getMessage());
         }
     }
 
     @Override
     public String getMarketChart(String coinId, int days) throws Exception {
-        String url = "https://api.coingecko.com/api/v3/coins/"+coinId+"/market_chart?vs_currency=usd&days="+days;
+        String url = baseUrl + "/coins/" + coinId + "/market_chart?vs_currency=usd&days=" + days;
 
         RestTemplate restTemplate = new RestTemplate();
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            HttpEntity<String> entity = new HttpEntity<String>("parameters", headers);
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET,entity,String.class);
+            HttpEntity<String> entity = createHttpEntity();
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
             return response.getBody();
-        }catch (HttpClientErrorException | HttpServerErrorException e) {
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
             throw new Exception(e.getMessage());
         }
     }
 
     @Override
     public String getCoinDetails(String coinId) throws Exception {
-        String url = "https://api.coingecko.com/api/v3/coins/"+coinId;
+        String url = baseUrl + "/coins/" + coinId;
 
         RestTemplate restTemplate = new RestTemplate();
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            HttpEntity<String> entity = new HttpEntity<>("parameters", headers);
+            HttpEntity<String> entity = createHttpEntity();
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
             JsonNode jsonNode = objectMapper.readTree(response.getBody());
@@ -112,7 +125,7 @@ public class CoinServiceImpl implements CoinService {
             coinRepository.save(coin);
 
             return response.getBody();
-        }catch (HttpClientErrorException | HttpServerErrorException e) {
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
             throw new Exception(e.getMessage());
         }
     }
@@ -120,7 +133,7 @@ public class CoinServiceImpl implements CoinService {
     @Override
     public Coin findById(String coinId) throws Exception {
         Optional<Coin> coin = coinRepository.findById(coinId);
-        if (coin.isEmpty()){
+        if (coin.isEmpty()) {
             throw new Exception("coin not found");
         }
         return coin.get();
@@ -128,49 +141,46 @@ public class CoinServiceImpl implements CoinService {
 
     @Override
     public String searchCoin(String keyWord) throws Exception {
-        String url = "https://api.coingecko.com/api/v3/search?query="+keyWord;
+        String url = baseUrl + "/search?query=" + keyWord;
 
         RestTemplate restTemplate = new RestTemplate();
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            HttpEntity<String> entity = new HttpEntity<String>("parameters", headers);
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET,entity,String.class);
+            HttpEntity<String> entity = createHttpEntity();
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
             return response.getBody();
-        }catch (HttpClientErrorException | HttpServerErrorException e) {
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
             throw new Exception(e.getMessage());
         }
     }
 
     @Override
     public String getTop50CoinsByMarketCapRank() throws Exception {
-        String url = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=50&page=1";
+        String url = baseUrl + "/coins/markets?vs_currency=usd&per_page=50&page=1";
 
         RestTemplate restTemplate = new RestTemplate();
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            HttpEntity<String> entity = new HttpEntity<String>("parameters", headers);
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET,entity,String.class);
+            HttpEntity<String> entity = createHttpEntity();
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
             return response.getBody();
 
-        }catch (HttpClientErrorException | HttpServerErrorException e) {
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
             throw new Exception(e.getMessage());
         }
     }
 
     @Override
     public String getTrendingCoins() throws Exception {
-        String url = "https://api.coingecko.com/api/v3/search/trending";
+        String url = baseUrl + "/search/trending";
 
         RestTemplate restTemplate = new RestTemplate();
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            HttpEntity<String> entity = new HttpEntity<String>("parameters", headers);
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET,entity,String.class);
+            HttpEntity<String> entity = createHttpEntity();
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
             return response.getBody();
-        }catch (HttpClientErrorException | HttpServerErrorException e) {
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
             throw new Exception(e.getMessage());
         }
     }

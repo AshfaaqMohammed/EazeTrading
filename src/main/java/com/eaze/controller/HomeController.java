@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/test")
+@RequestMapping("/")
 public class HomeController {
 
     private final CoinService coinService;
@@ -24,11 +24,5 @@ public class HomeController {
     @GetMapping
     public String home() {
         return "welcome to home page";
-    }
-
-    @GetMapping("/coins-list")
-    public ResponseEntity<List<Coin>> getCoinList(
-            @RequestParam int page) throws Exception {
-        return new ResponseEntity<>(coinService.getCoinList(page), HttpStatus.OK);
     }
 }
