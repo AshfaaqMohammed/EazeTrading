@@ -1,6 +1,5 @@
 package com.eaze.service;
 
-import com.eaze.config.JwtTokenValidator;
 import com.eaze.model.User;
 import com.eaze.repository.UserRepository;
 import org.slf4j.Logger;

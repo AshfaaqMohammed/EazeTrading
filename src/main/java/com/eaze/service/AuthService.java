@@ -28,6 +28,7 @@ public class AuthService {
     private final EmailService emailService;
     private final WatchListService watchListService;
     private final PasswordEncoder passwordEncoder;
+    private final JwtProvider jwtProvider;
 
 
     public AuthResponse register(User user) throws Exception {
@@ -55,7 +56,7 @@ public class AuthService {
 
         SecurityContextHolder.getContext().setAuthentication(auth);
 
-        String jwt = JwtProvider.generateToken(auth);
+        String jwt = jwtProvider.generateToken(auth);
 
         AuthResponse response = new AuthResponse();
         response.setJwt(jwt);
@@ -74,7 +75,7 @@ public class AuthService {
         Authentication auth = authenticate(email, password);
         SecurityContextHolder.getContext().setAuthentication(auth);
 
-        String jwt = JwtProvider.generateToken(auth);
+        String jwt = jwtProvider.generateToken(auth);
 
         if (authUser.getTwoFactorAuth().isEnabled()) {
             AuthResponse res = new AuthResponse();

@@ -17,14 +17,16 @@ import java.util.Optional;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final JwtProvider jwtProvider;
 
-    public UserServiceImpl(UserRepository userRepository) {
+    public UserServiceImpl(UserRepository userRepository, JwtProvider jwtProvider) {
         this.userRepository = userRepository;
+        this.jwtProvider = jwtProvider;
     }
 
     @Override
     public User findUserProfileByJwt(String jwt) throws Exception {
-        String email = JwtProvider.getEmailFromToken(jwt);
+        String email = jwtProvider.getEmailFromToken(jwt);
         User user = userRepository.findByEmail(email);
 
         if (user == null) {

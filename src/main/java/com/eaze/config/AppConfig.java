@@ -18,6 +18,13 @@ import java.util.List;
 
 @Configuration
 public class AppConfig {
+
+    private final JwtTokenValidator jwtTokenValidator;
+
+    public AppConfig(JwtTokenValidator jwtTokenValidator) {
+        this.jwtTokenValidator = jwtTokenValidator;
+    }
+
     // determine which spring security filter instance should be invoked for the current request.
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -26,7 +33,7 @@ public class AppConfig {
                         .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
-                .addFilterBefore(new JwtTokenValidator(), BasicAuthenticationFilter.class)
+                .addFilterBefore(jwtTokenValidator, BasicAuthenticationFilter.class)
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()));
         return http.build();
