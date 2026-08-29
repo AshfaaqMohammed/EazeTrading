@@ -1,5 +1,6 @@
 package com.eaze.service.domain;
 
+import com.eaze.domian.USER_ROLE;
 import com.eaze.domian.VerificationType;
 import com.eaze.model.User;
 
@@ -10,4 +11,5 @@ public interface UserService {
 
     User enableTwoFactorAuthentication(VerificationType verificationType, User user);
     User updatePassword(User user, String newPassword);
+    User updateUserRole(Long userId, USER_ROLE newRole) throws Exception;
 }

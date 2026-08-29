@@ -1,5 +1,7 @@
 package com.eaze.controller;
 
+import com.eaze.domian.PaymentOrderStatus;
+import com.eaze.exceptions.PaymentException;
 import com.eaze.model.*;
 import com.eaze.service.domain.OrderService;
 import com.eaze.service.domain.PaymentService;
@@ -61,12 +63,17 @@ public class WalletController {
         User user = userService.findUserProfileByJwt(jwt);
         Wallet wallet = walletService.getUserWallet(user);
         PaymentOrder order = paymentService.getPaymentOrderById(orderId);
+
+        if (!order.getStatus().equals(PaymentOrderStatus.PENDING)) {
+            throw new PaymentException("This payment order has already been processed.", HttpStatus.CONFLICT);
+        }
+
         Boolean status = paymentService.proceedPaymentOrder(order, paymentId);
 
         if (status) {
             wallet = walletService.addBalance(wallet, order.getAmount());
         }else {
-            throw new Exception("payment failed!!");
+            throw new PaymentException("Payment verification failed. No funds were added.", HttpStatus.BAD_REQUEST);
         }
         return new ResponseEntity<>(wallet, HttpStatus.ACCEPTED);
     }

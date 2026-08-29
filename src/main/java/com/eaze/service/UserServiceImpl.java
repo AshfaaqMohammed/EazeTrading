@@ -1,11 +1,14 @@
 package com.eaze.service;
 
 import com.eaze.config.JwtProvider;
+import com.eaze.domian.USER_ROLE;
 import com.eaze.domian.VerificationType;
+import com.eaze.exceptions.ApiResponseException;
 import com.eaze.model.TwoFactorAuth;
 import com.eaze.model.User;
 import com.eaze.repository.UserRepository;
 import com.eaze.service.domain.UserService;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -66,6 +69,20 @@ public class UserServiceImpl implements UserService {
     @Override
     public User updatePassword(User user, String newPassword) {
         user.setPassword(newPassword);
+        return userRepository.save(user);
+    }
+
+    @Override
+    public User updateUserRole(Long userId, USER_ROLE newRole) throws Exception {
+        User user = findUserById(userId);
+
+        if (user.getRole().equals(USER_ROLE.ROLE_ADMIN) && !newRole.equals(USER_ROLE.ROLE_ADMIN)) {
+            long adminCount = userRepository.countByRole(USER_ROLE.ROLE_ADMIN);
+            if (adminCount <= 1) {
+                throw new ApiResponseException("Cannot demote the last remaining admin.", HttpStatus.CONFLICT);
+            }
+        }
+        user.setRole(newRole);
         return userRepository.save(user);
     }
 }

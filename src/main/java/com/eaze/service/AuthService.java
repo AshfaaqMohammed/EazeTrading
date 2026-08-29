@@ -15,6 +15,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -26,6 +27,7 @@ public class AuthService {
     private final TwoFactorOTPService twoFactorOTPService;
     private final EmailService emailService;
     private final WatchListService watchListService;
+    private final PasswordEncoder passwordEncoder;
 
 
     public AuthResponse register(User user) throws Exception {
@@ -37,16 +39,18 @@ public class AuthService {
 
         User newUser = new User();
         newUser.setFullName(user.getFullName());
-        newUser.setPassword(user.getPassword());
+        newUser.setPassword(passwordEncoder.encode(user.getPassword()));
         newUser.setEmail(user.getEmail());
 
         User savedUser = userRepository.save(newUser);
 
         watchListService.createWatchList(savedUser);
 
+        UserDetails userDetails = customUserDetailsService.loadUserByUsername(savedUser.getEmail());
         Authentication auth = new UsernamePasswordAuthenticationToken(
-                user.getEmail(),
-                user.getPassword()
+                userDetails,
+                null,
+                userDetails.getAuthorities()
         );
 
         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -121,7 +125,7 @@ public class AuthService {
         if (userDetails == null) {
             throw new BadCredentialsException("invalid username");
         }
-        if(!password.equals(userDetails.getPassword())){
+        if(!passwordEncoder.matches(password, userDetails.getPassword())){
             throw new BadCredentialsException("invalid password");
         }
         return new UsernamePasswordAuthenticationToken(userDetails, password, userDetails.getAuthorities());

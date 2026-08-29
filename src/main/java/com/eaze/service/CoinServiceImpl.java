@@ -27,13 +27,13 @@ public class CoinServiceImpl implements CoinService {
     private final CoinRepository coinRepository;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${coingecko.api.key}")
+    @Value("${coingecko.api.key:}")
     private String apiKey;
 
-    @Value("${coingecko.api.base-url}")
+    @Value("${coingecko.api.base-url:}")
     private String baseUrl;
 
-    @Value("${coingecko.api.header-name}")
+    @Value("${coingecko.api.header-name:}")
     private String headerName;
 
     public CoinServiceImpl(CoinRepository coinRepository) {
@@ -48,6 +48,7 @@ public class CoinServiceImpl implements CoinService {
 
     @Override
     public List<Coin> getCoinList(int page) throws Exception {
+        validateCoinGeckoConfig();
         String url = baseUrl + "/coins/markets?vs_currency=usd&per_page=10&page=" + page;
 
         RestTemplate restTemplate = new RestTemplate();
@@ -65,6 +66,7 @@ public class CoinServiceImpl implements CoinService {
 
     @Override
     public String getMarketChart(String coinId, int days) throws Exception {
+        validateCoinGeckoConfig();
         String url = baseUrl + "/coins/" + coinId + "/market_chart?vs_currency=usd&days=" + days;
 
         RestTemplate restTemplate = new RestTemplate();
@@ -80,6 +82,7 @@ public class CoinServiceImpl implements CoinService {
 
     @Override
     public String getCoinDetails(String coinId) throws Exception {
+        validateCoinGeckoConfig();
         String url = baseUrl + "/coins/" + coinId;
 
         RestTemplate restTemplate = new RestTemplate();
@@ -141,6 +144,7 @@ public class CoinServiceImpl implements CoinService {
 
     @Override
     public String searchCoin(String keyWord) throws Exception {
+        validateCoinGeckoConfig();
         String url = baseUrl + "/search?query=" + keyWord;
 
         RestTemplate restTemplate = new RestTemplate();
@@ -156,6 +160,7 @@ public class CoinServiceImpl implements CoinService {
 
     @Override
     public String getTop50CoinsByMarketCapRank() throws Exception {
+        validateCoinGeckoConfig();
         String url = baseUrl + "/coins/markets?vs_currency=usd&per_page=50&page=1";
 
         RestTemplate restTemplate = new RestTemplate();
@@ -172,6 +177,7 @@ public class CoinServiceImpl implements CoinService {
 
     @Override
     public String getTrendingCoins() throws Exception {
+        validateCoinGeckoConfig();
         String url = baseUrl + "/search/trending";
 
         RestTemplate restTemplate = new RestTemplate();
@@ -182,6 +188,12 @@ public class CoinServiceImpl implements CoinService {
             return response.getBody();
         } catch (HttpClientErrorException | HttpServerErrorException e) {
             throw new Exception(e.getMessage());
+        }
+    }
+
+    private void validateCoinGeckoConfig() throws Exception {
+        if (apiKey == null || apiKey.isBlank() || baseUrl == null || baseUrl.isBlank() || headerName == null || headerName.isBlank()) {
+            throw new Exception("CoinGecko API is not configured. Please set coingecko.api.key, coingecko.api.base-url, and coingecko.api.header-name in application.properties");
         }
     }
 }

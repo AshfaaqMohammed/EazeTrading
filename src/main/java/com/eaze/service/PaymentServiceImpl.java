@@ -2,6 +2,7 @@ package com.eaze.service;
 
 import com.eaze.domian.PaymentMethod;
 import com.eaze.domian.PaymentOrderStatus;
+import com.eaze.exceptions.PaymentException;
 import com.eaze.model.PaymentOrder;
 import com.eaze.model.User;
 import com.eaze.repository.PaymentOrderRepository;
@@ -18,6 +19,7 @@ import com.stripe.param.checkout.SessionCreateParams;
 import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -26,13 +28,13 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentOrderRepository paymentOrderRepository;
 
-    @Value("${stripe.api.key}")
+    @Value("${stripe.api.key:}")
     private String stripSecretKey;
 
-    @Value("${razorpay.api.key}")
+    @Value("${razorpay.api.key:}")
     private String apiKey;
 
-    @Value("${razorpay.api.secret}")
+    @Value("${razorpay.api.secret:}")
     private String apiSecretKey;
 
     @Override
@@ -60,19 +62,19 @@ public class PaymentServiceImpl implements PaymentService {
                 RazorpayClient razorpay = new RazorpayClient(apiKey, apiSecretKey);
                 Payment payment = razorpay.payments.fetch(paymentId);
 
-                Integer amount = payment.get("amount");
                 String status = payment.get("status");
 
                 if (status.equals("captured")) {
                     paymentOrder.setStatus(PaymentOrderStatus.SUCCESS);
+                    paymentOrderRepository.save(paymentOrder);
                     return true;
                 }else{
                     paymentOrder.setStatus(PaymentOrderStatus.FAILED);
+                    paymentOrderRepository.save(paymentOrder);
+                    return false;
                 }
-                paymentOrderRepository.save(paymentOrder);
             }
-            paymentOrder.setStatus(PaymentOrderStatus.FAILED);
-            paymentOrderRepository.save(paymentOrder);
+            throw new PaymentException("Stripe payments are in progress - available soon. Please use Razorpay for now.", HttpStatus.NOT_IMPLEMENTED);
         }
         return false;
     }

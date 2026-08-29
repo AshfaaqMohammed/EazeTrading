@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -34,6 +35,9 @@ public class WithdrawalController {
         User user = userService.findUserProfileByJwt(jwt);
         Wallet userWallet = walletService.getUserWallet(user);
 
+        if (userWallet.getBalance().compareTo(BigDecimal.valueOf(amount)) < 0) {
+            throw new Exception("Insufficient balance for withdrawal");
+        }
         Withdrawal withdrawal = withdrawalService.requestWithdrawal(amount, user);
         walletService.addBalance(userWallet, -withdrawal.getAmount());// we are sending -ve amount, this is subtracting from the actual balance
 
@@ -52,13 +56,13 @@ public class WithdrawalController {
     public ResponseEntity<?> proceedWithdrawal(@PathVariable("id") Long id,
                                                @PathVariable("accept") boolean accept,
                                                @RequestHeader("Authorization") String jwt) throws Exception {
-        User user = userService.findUserProfileByJwt(jwt);
+
         Withdrawal withdrawal = withdrawalService.proceedWithdrawal(id, accept);
-        Wallet userWallet = walletService.getUserWallet(user);
 
         // if declined (false) then we will add back the amount which we deducted in above endpoint.
         if (!accept) {
-            walletService.addBalance(userWallet, withdrawal.getAmount());
+            Wallet ownerWallet = walletService.getUserWallet(withdrawal.getUser());
+            walletService.addBalance(ownerWallet, withdrawal.getAmount());
         }
 
         return new ResponseEntity<>(withdrawal, HttpStatus.OK);

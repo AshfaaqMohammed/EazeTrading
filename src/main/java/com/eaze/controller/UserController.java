@@ -1,6 +1,8 @@
 package com.eaze.controller;
 
+import com.eaze.domian.USER_ROLE;
 import com.eaze.domian.VerificationType;
+import com.eaze.exceptions.ApiResponseException;
 import com.eaze.model.ForgotPasswordToken;
 import com.eaze.model.User;
 import com.eaze.model.VerificationCode;
@@ -120,6 +122,21 @@ public class UserController {
             return new ResponseEntity<>(res, HttpStatus.ACCEPTED);
         }
         throw new Exception("Wrong Otp, Reset password failed!!!");
+    }
+
+    @PatchMapping("/api/admin/users/{id}/role")
+    public ResponseEntity<User> updateUserRole(
+            @RequestHeader("Authorization") String jwt,
+            @PathVariable("id") Long id,
+            @RequestParam("role") USER_ROLE role) throws Exception {
+        User actingAdmin = userService.findUserProfileByJwt(jwt);
+
+        if (actingAdmin.getId().equals(id) && !role.equals(USER_ROLE.ROLE_ADMIN)) {
+            throw new ApiResponseException("Admins cannot demote themselves.", HttpStatus.CONFLICT);
+        }
+
+        User updated = userService.updateUserRole(id, role);
+        return new ResponseEntity<>(updated, HttpStatus.OK);
     }
 
 }
