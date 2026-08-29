@@ -4,6 +4,7 @@ import com.eaze.domian.WithdrawalStatus;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -15,7 +16,7 @@ public class Withdrawal {
     private Long id;
 
     private WithdrawalStatus status;
-    private Long amount;
+    private BigDecimal amount;
 
     @ManyToOne
     private User user;

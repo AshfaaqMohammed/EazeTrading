@@ -7,6 +7,7 @@ import com.eaze.repository.WalletTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -21,7 +22,7 @@ public class TransactionService {
     }
 
     public WalletTransaction createTransaction(Wallet userWallet, WalletTransactionType walletTransactionType,
-                                               LocalDateTime dateTime, String transferId, String purpose, Long amount) {
+                                               LocalDateTime dateTime, String transferId, String purpose, BigDecimal amount) {
         WalletTransaction walletTransaction = new WalletTransaction();
         walletTransaction.setWallet(userWallet);
         walletTransaction.setType(walletTransactionType);

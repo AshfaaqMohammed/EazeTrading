@@ -8,6 +8,7 @@ import com.eaze.service.domain.AssetService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,12 +19,12 @@ public class AssetServiceImp implements AssetService {
     private final AssetRepository assetRepository;
 
     @Override
-    public Asset createAsset(User user, Coin coin, double quantity) {
+    public Asset createAsset(User user, Coin coin, BigDecimal quantity) {
         Asset asset = new Asset();
         asset.setUser(user);
         asset.setCoin(coin);
         asset.setQuantity(quantity);
-        asset.setBuyPrice(coin.getCurrentPrice());
+        asset.setBuyPrice(BigDecimal.valueOf(coin.getCurrentPrice()));
         return assetRepository.save(asset);
     }
 
@@ -47,10 +48,10 @@ public class AssetServiceImp implements AssetService {
     }
 
     @Override
-    public Asset updateAsset(Long assetId, double quantity) throws Exception {
+    public Asset updateAsset(Long assetId, BigDecimal quantity) throws Exception {
         Asset oldAsset = getAssetById(assetId);
 
-        oldAsset.setQuantity(oldAsset.getQuantity()+quantity);
+        oldAsset.setQuantity(oldAsset.getQuantity().add(quantity));
 
         return assetRepository.save(oldAsset);
     }

@@ -22,11 +22,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+
 @Service
 @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentOrderRepository paymentOrderRepository;
+
+    private static final BigDecimal MINOR_UNIT_FACTOR = BigDecimal.valueOf(100);
 
     @Value("${stripe.api.key:}")
     private String stripSecretKey;
@@ -38,7 +42,7 @@ public class PaymentServiceImpl implements PaymentService {
     private String apiSecretKey;
 
     @Override
-    public PaymentOrder createOrder(User user, Long amount, PaymentMethod paymentMethod) {
+    public PaymentOrder createOrder(User user, BigDecimal amount, PaymentMethod paymentMethod) {
         PaymentOrder paymentOrder = new PaymentOrder();
 
         paymentOrder.setAmount(amount);
@@ -80,13 +84,13 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public PaymentResponse createRazorPaymentLink(User user, Long amount, Long orderId) {
-        Long Amount = amount * 100;
+    public PaymentResponse createRazorPaymentLink(User user, BigDecimal amount, Long orderId) {
+        long amountInMinorUnits = amount.multiply(MINOR_UNIT_FACTOR).longValueExact();
 
         try {
             RazorpayClient razorpay = new RazorpayClient(apiKey, apiSecretKey);
 
-            JSONObject paymentLinkRequest = getJsonObject(user, Amount,orderId);
+            JSONObject paymentLinkRequest = getJsonObject(user, amountInMinorUnits, orderId);
 
             PaymentLink paymentLink = razorpay.paymentLink.create(paymentLinkRequest);
 
@@ -102,9 +106,9 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
-    private static JSONObject getJsonObject(User user, Long Amount, Long orderId) {
+    private static JSONObject getJsonObject(User user, long amount, Long orderId) {
         JSONObject paymentLinkRequest = new JSONObject();
-        paymentLinkRequest.put("amount", Amount);
+        paymentLinkRequest.put("amount", amount);
         paymentLinkRequest.put("currency","INR");
 
         JSONObject customer = new JSONObject();
@@ -125,8 +129,10 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public PaymentResponse createStripePaymentLink(User user, Long amount, Long orderId) throws StripeException {
+    public PaymentResponse createStripePaymentLink(User user, BigDecimal amount, Long orderId) throws StripeException {
         Stripe.apiKey = stripSecretKey;
+
+        long amountInMinorUnits = amount.multiply(MINOR_UNIT_FACTOR).longValueExact();
 
         SessionCreateParams params = SessionCreateParams.builder()
                 .addPaymentMethodType(SessionCreateParams.PaymentMethodType.CARD)
@@ -137,7 +143,7 @@ public class PaymentServiceImpl implements PaymentService {
                         .setQuantity(1L)
                         .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
                                 .setCurrency("usd")
-                                .setUnitAmount(amount*100)
+                                .setUnitAmount(amountInMinorUnits)
                                 .setProductData(SessionCreateParams
                                         .LineItem
                                         .PriceData

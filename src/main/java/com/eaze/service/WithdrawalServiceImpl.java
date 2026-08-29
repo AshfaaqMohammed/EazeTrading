@@ -8,6 +8,7 @@ import com.eaze.service.domain.WithdrawalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -19,7 +20,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private final WithdrawalRepository withdrawalRepository;
 
     @Override
-    public Withdrawal requestWithdrawal(Long amount, User user) {
+    public Withdrawal requestWithdrawal(BigDecimal amount, User user) {
 
         Withdrawal withdrawal = new Withdrawal();
 

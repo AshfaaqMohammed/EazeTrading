@@ -4,11 +4,12 @@ import com.eaze.model.Asset;
 import com.eaze.model.Coin;
 import com.eaze.model.User;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface AssetService {
 
-    Asset createAsset(User user, Coin coin, double quantity);
+    Asset createAsset(User user, Coin coin, BigDecimal quantity);
 
     Asset getAssetById(Long assetId) throws Exception;
 
@@ -16,7 +17,7 @@ public interface AssetService {
 
     List<Asset> getUsersAssets(Long userId);
 
-    Asset updateAsset(Long assetId, double quantity) throws Exception;
+    Asset updateAsset(Long assetId, BigDecimal quantity) throws Exception;
 
     Asset findAssetByUserIdAndCoinId(Long userid, String coinId);
 

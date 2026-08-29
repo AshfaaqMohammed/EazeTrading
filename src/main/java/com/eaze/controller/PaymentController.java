@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
@@ -24,7 +26,7 @@ public class PaymentController {
     @PostMapping("/payment/{paymentMethod}/amount/{amount}")
     public ResponseEntity<PaymentResponse> paymentHandler(@RequestHeader("Authorization") String jwt,
                                                           @PathVariable PaymentMethod paymentMethod,
-                                                          @PathVariable Long amount) throws Exception, RazorpayException, StripeException {
+                                                          @PathVariable BigDecimal amount) throws Exception, RazorpayException, StripeException {
         User user = userService.findUserProfileByJwt(jwt);
 
         PaymentOrder order = paymentService.createOrder(user, amount, paymentMethod);

@@ -32,9 +32,9 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
-    public Wallet addBalance(Wallet wallet, Long money) {
+    public Wallet addBalance(Wallet wallet, BigDecimal money) {
         BigDecimal balance = wallet.getBalance();
-        BigDecimal newBalance = balance.add(BigDecimal.valueOf(money));
+        BigDecimal newBalance = balance.add(money);
 
         wallet.setBalance(newBalance);
         return walletRepository.save(wallet);
@@ -50,13 +50,13 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
-    public Wallet walletToWalletTransfer(User sender, Wallet receiverWallet, Long amount) throws Exception {
+    public Wallet walletToWalletTransfer(User sender, Wallet receiverWallet, BigDecimal amount) throws Exception {
         Wallet senderWallet = walletRepository.findByUserId(sender.getId());
 
-        if (senderWallet.getBalance().compareTo(BigDecimal.valueOf(amount)) < 0) {
+        if (senderWallet.getBalance().compareTo(amount) < 0) {
             throw new Exception("Insufficient balance");
         }
-        BigDecimal senderBalance = senderWallet.getBalance().subtract(BigDecimal.valueOf(amount));
+        BigDecimal senderBalance = senderWallet.getBalance().subtract(amount);
         senderWallet.setBalance(senderBalance);
         walletRepository.save(senderWallet);
 

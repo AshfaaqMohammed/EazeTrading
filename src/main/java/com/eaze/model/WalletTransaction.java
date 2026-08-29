@@ -4,7 +4,7 @@ import com.eaze.domian.WalletTransactionType;
 import jakarta.persistence.*;
 import lombok.Data;
 
-import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -26,5 +26,5 @@ public class WalletTransaction {
 
     private String purpose;
 
-    private Long amount;
+    private BigDecimal amount;
 }

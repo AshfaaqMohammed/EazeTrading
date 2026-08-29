@@ -28,13 +28,14 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Order createOrder(User user, OrderItem orderItem, OrderType orderType) {
-        double price = orderItem.getCoin().getCurrentPrice() * orderItem.getQuantity();
+        BigDecimal price = BigDecimal.valueOf(orderItem.getCoin().getCurrentPrice())
+                .multiply(orderItem.getQuantity());
 
         Order order = new Order();
         order.setUser(user);
         order.setOrderItem(orderItem);
         order.setOrderType(orderType);
-        order.setPrice(BigDecimal.valueOf(price));
+        order.setPrice(price);
         order.setTimestamp(LocalDateTime.now());
         order.setOrderStatus(OrderStatus.PENDING);
 
@@ -58,7 +59,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public Order processOrder(Coin coin, double quantity, OrderType orderType, User user) throws Exception {
+    public Order processOrder(Coin coin, BigDecimal quantity, OrderType orderType, User user) throws Exception {
         if (orderType.equals(OrderType.BUY)) {
             return buyAsset(coin, quantity, user);
         }else if (orderType.equals(OrderType.SELL)) {
@@ -67,7 +68,7 @@ public class OrderServiceImpl implements OrderService {
         throw new Exception("No such OrderType - "+orderType);
     }
 
-    private OrderItem createOrderItem(Coin coin, double quantity, double buyPrice, double sellPrice) {
+    private OrderItem createOrderItem(Coin coin, BigDecimal quantity, BigDecimal buyPrice, BigDecimal sellPrice) {
         OrderItem orderItem = new OrderItem();
         orderItem.setCoin(coin);
         orderItem.setQuantity(quantity);
@@ -78,12 +79,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Transactional
-    protected Order buyAsset(Coin coin, double quantity, User user) throws Exception {
-        if (quantity<=0) {
+    protected Order buyAsset(Coin coin, BigDecimal quantity, User user) throws Exception {
+        if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
             throw new Exception("Quantity must not be 0 or <0");
         }
-        double buyPrice = coin.getCurrentPrice();
-        OrderItem orderItem = createOrderItem(coin, quantity, buyPrice, 0);
+        BigDecimal buyPrice = BigDecimal.valueOf(coin.getCurrentPrice());
+        OrderItem orderItem = createOrderItem(coin, quantity, buyPrice, BigDecimal.ZERO);
         Order order = createOrder(user, orderItem, OrderType.BUY);
         orderItem.setOrder(order);
 
@@ -104,28 +105,28 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Transactional
-    protected Order sellAsset(Coin coin, double quantity, User user) throws Exception {
-        if (quantity <=0 ) {
+    protected Order sellAsset(Coin coin, BigDecimal quantity, User user) throws Exception {
+        if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
             throw new Exception("Quantity must not be 0 or <0");
         }
 
-        double sellPrice = coin.getCurrentPrice();
+        BigDecimal sellPrice = BigDecimal.valueOf(coin.getCurrentPrice());
 
         Asset assetToSell = assetService.findAssetByUserIdAndCoinId(user.getId(), coin.getId());
 
         if (assetToSell!=null) {
-            double buyPrice = assetToSell.getBuyPrice();
+            BigDecimal buyPrice = assetToSell.getBuyPrice();
             OrderItem orderItem = createOrderItem(coin, quantity, buyPrice, sellPrice);
             Order order = createOrder(user, orderItem, OrderType.SELL);
             orderItem.setOrder(order);
 
-            if (assetToSell.getQuantity() >= quantity) {
+            if (assetToSell.getQuantity().compareTo(quantity) >= 0) {
                 order.setOrderStatus(OrderStatus.SUCCESS);
                 Order savedOrder = orderRepository.save(order);
                 walletService.payOrderPayment(order, user);
 
-                Asset updatedAsset = assetService.updateAsset(assetToSell.getId(), -quantity);
-                if (updatedAsset.getQuantity() * coin.getCurrentPrice() <= 1) {
+                Asset updatedAsset = assetService.updateAsset(assetToSell.getId(), quantity.negate());
+                if (updatedAsset.getQuantity().multiply(BigDecimal.valueOf(coin.getCurrentPrice())).compareTo(BigDecimal.ONE) <= 0) {
                     assetService.deleteAsset(updatedAsset.getId());
                 }
                 return savedOrder;

@@ -29,17 +29,17 @@ public class WithdrawalController {
     private final TransactionService transactionService;
 
     @PostMapping("/api/withdrawal/{amount}")
-    public ResponseEntity<?> withdrawalRequest(@PathVariable("amount") Long amount,
+    public ResponseEntity<?> withdrawalRequest(@PathVariable("amount") BigDecimal amount,
                                               @RequestHeader("Authorization") String jwt) throws Exception {
 
         User user = userService.findUserProfileByJwt(jwt);
         Wallet userWallet = walletService.getUserWallet(user);
 
-        if (userWallet.getBalance().compareTo(BigDecimal.valueOf(amount)) < 0) {
+        if (userWallet.getBalance().compareTo(amount) < 0) {
             throw new Exception("Insufficient balance for withdrawal");
         }
         Withdrawal withdrawal = withdrawalService.requestWithdrawal(amount, user);
-        walletService.addBalance(userWallet, -withdrawal.getAmount());// we are sending -ve amount, this is subtracting from the actual balance
+        walletService.addBalance(userWallet, withdrawal.getAmount().negate());// subtracting from the actual balance
 
         transactionService.createTransaction(
                 userWallet,
@@ -59,7 +59,7 @@ public class WithdrawalController {
 
         Withdrawal withdrawal = withdrawalService.proceedWithdrawal(id, accept);
 
-        // if declined (false) then we will add back the amount which we deducted in above endpoint.
+        // if declined, refund the amount to the withdrawal owner (not the admin acting on it).
         if (!accept) {
             Wallet ownerWallet = walletService.getUserWallet(withdrawal.getUser());
             walletService.addBalance(ownerWallet, withdrawal.getAmount());
