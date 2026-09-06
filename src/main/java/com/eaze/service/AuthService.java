@@ -7,6 +7,7 @@ import com.eaze.request.UserLoginRequest;
 import com.eaze.repository.UserRepository;
 import com.eaze.response.AuthResponse;
 import com.eaze.service.domain.TwoFactorOTPService;
+import com.eaze.service.domain.WalletService;
 import com.eaze.service.domain.WatchListService;
 import com.eaze.utils.OtpUtils;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class AuthService {
     private final TwoFactorOTPService twoFactorOTPService;
     private final EmailService emailService;
     private final WatchListService watchListService;
+    private final WalletService walletService;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
 
@@ -46,6 +48,10 @@ public class AuthService {
         User savedUser = userRepository.save(newUser);
 
         watchListService.createWatchList(savedUser);
+
+        // Create the user's wallet once, at registration, so it never needs
+        // lazy (and racy) creation on later read endpoints.
+        walletService.getUserWallet(savedUser);
 
         UserDetails userDetails = customUserDetailsService.loadUserByUsername(savedUser.getEmail());
         Authentication auth = new UsernamePasswordAuthenticationToken(

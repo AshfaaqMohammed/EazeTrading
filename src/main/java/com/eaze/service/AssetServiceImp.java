@@ -9,12 +9,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class AssetServiceImp implements AssetService {
+
+    private static final int COST_BASIS_SCALE = 8;
 
     private final AssetRepository assetRepository;
 
@@ -52,6 +55,28 @@ public class AssetServiceImp implements AssetService {
         Asset oldAsset = getAssetById(assetId);
 
         oldAsset.setQuantity(oldAsset.getQuantity().add(quantity));
+
+        return assetRepository.save(oldAsset);
+    }
+
+    @Override
+    public Asset updateAssetOnBuy(Long assetId, BigDecimal addedQuantity, BigDecimal buyPrice) throws Exception {
+        Asset oldAsset = getAssetById(assetId);
+
+        BigDecimal oldQuantity = oldAsset.getQuantity();
+        BigDecimal oldBuyPrice = oldAsset.getBuyPrice();
+        BigDecimal newQuantity = oldQuantity.add(addedQuantity);
+
+        // Weighted-average cost basis:
+        // newBuyPrice = (oldQty * oldBuyPrice + addedQty * buyPrice) / (oldQty + addedQty)
+        if (newQuantity.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal totalCost = oldQuantity.multiply(oldBuyPrice)
+                    .add(addedQuantity.multiply(buyPrice));
+            BigDecimal newBuyPrice = totalCost.divide(newQuantity, COST_BASIS_SCALE, RoundingMode.HALF_UP);
+            oldAsset.setBuyPrice(newBuyPrice);
+        }
+
+        oldAsset.setQuantity(newQuantity);
 
         return assetRepository.save(oldAsset);
     }

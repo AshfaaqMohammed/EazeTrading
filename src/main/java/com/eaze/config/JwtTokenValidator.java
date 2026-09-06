@@ -34,16 +34,10 @@ public class JwtTokenValidator extends OncePerRequestFilter {
 
         String header = request.getHeader(JwtConstant.JWT_HEADER);
 
-        // No Authorization header -> let the chain decide (public endpoints, etc.)
-        if (header == null) {
+        // No Authorization header, or not a Bearer token -> don't authenticate,
+        // let the authorization rules decide (public endpoints like /auth/** proceed).
+        if (header == null || !header.startsWith(BEARER_PREFIX)) {
             filterChain.doFilter(request, response);
-            return;
-        }
-
-        // Header present but missing/invalid Bearer scheme -> 401
-        if (!header.startsWith(BEARER_PREFIX)) {
-            LOG.warn("Authorization header missing 'Bearer ' prefix");
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid authorization header");
             return;
         }
 
@@ -61,10 +55,12 @@ public class JwtTokenValidator extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(auth);
 
         } catch (Exception e) {
-            // Expired / tampered / malformed token is a client error -> 401, not 500.
+            // Expired / tampered / malformed token: do NOT authenticate, but do NOT
+            // hard-fail the request here. A stale token must not block public endpoints
+            // (e.g. /auth/login after logout). Protected endpoints still get denied by
+            // the authorization rules because no authentication was set.
             LOG.warn("Invalid JWT: {}", e.getMessage());
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
-            return;
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);

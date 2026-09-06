@@ -1,5 +1,6 @@
 package com.eaze.controller;
 
+import com.eaze.exceptions.ApiResponseException;
 import com.eaze.model.Asset;
 import com.eaze.model.User;
 import com.eaze.service.domain.AssetService;
@@ -20,8 +21,15 @@ public class AssetController {
     private final UserService userService;
 
     @GetMapping("/{assetId}")
-    public ResponseEntity<Asset> getAssetById(@PathVariable("assetId") Long assetId) throws Exception {
+    public ResponseEntity<Asset> getAssetById(@PathVariable("assetId") Long assetId,
+                                              @RequestHeader("Authorization") String jwt) throws Exception {
+        User user = userService.findUserProfileByJwt(jwt);
         Asset asset = assetService.getAssetById(assetId);
+
+        if (!asset.getUser().getId().equals(user.getId())) {
+            throw new ApiResponseException("You don't have access to this asset.", HttpStatus.FORBIDDEN);
+        }
+
         return new ResponseEntity<>(asset, HttpStatus.OK);
     }
 

@@ -19,6 +19,8 @@ public interface AssetService {
 
     Asset updateAsset(Long assetId, BigDecimal quantity) throws Exception;
 
+    Asset updateAssetOnBuy(Long assetId, BigDecimal addedQuantity, BigDecimal buyPrice) throws Exception;
+
     Asset findAssetByUserIdAndCoinId(Long userid, String coinId);
 
     void deleteAsset(Long assetId);

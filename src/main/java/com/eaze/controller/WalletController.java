@@ -64,6 +64,11 @@ public class WalletController {
         Wallet wallet = walletService.getUserWallet(user);
         PaymentOrder order = paymentService.getPaymentOrderById(orderId);
 
+        // Ownership check: the payment order must belong to the calling user.
+        if (order.getUser() == null || !order.getUser().getId().equals(user.getId())) {
+            throw new PaymentException("You don't have access to this payment order.", HttpStatus.FORBIDDEN);
+        }
+
         if (!order.getStatus().equals(PaymentOrderStatus.PENDING)) {
             throw new PaymentException("This payment order has already been processed.", HttpStatus.CONFLICT);
         }
@@ -71,7 +76,7 @@ public class WalletController {
         Boolean status = paymentService.proceedPaymentOrder(order, paymentId);
 
         if (status) {
-            wallet = walletService.addBalance(wallet, order.getAmount());
+            wallet = walletService.deposit(wallet, order.getAmount());
         }else {
             throw new PaymentException("Payment verification failed. No funds were added.", HttpStatus.BAD_REQUEST);
         }

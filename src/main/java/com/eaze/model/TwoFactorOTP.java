@@ -5,12 +5,15 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class TwoFactorOTP {
 
     @Id
+    @EqualsAndHashCode.Include
     private String id;
 
     private String otp;

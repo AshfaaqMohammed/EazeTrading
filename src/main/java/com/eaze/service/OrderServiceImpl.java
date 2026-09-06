@@ -2,6 +2,7 @@ package com.eaze.service;
 
 import com.eaze.domian.OrderStatus;
 import com.eaze.domian.OrderType;
+import com.eaze.domian.WalletTransactionType;
 import com.eaze.model.*;
 import com.eaze.repository.OrderItemRepository;
 import com.eaze.repository.OrderRepository;
@@ -25,6 +26,7 @@ public class OrderServiceImpl implements OrderService {
     private final WalletService walletService;
     private final OrderItemRepository orderItemRepository;
     private final AssetService assetService;
+    private final TransactionService transactionService;
 
     @Override
     public Order createOrder(User user, OrderItem orderItem, OrderType orderType) {
@@ -88,7 +90,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = createOrder(user, orderItem, OrderType.BUY);
         orderItem.setOrder(order);
 
-        walletService.payOrderPayment(order, user);
+        Wallet wallet = walletService.payOrderPayment(order, user);
         order.setOrderStatus(OrderStatus.SUCCESS);
 
         Order savedOrder = orderRepository.save(order);
@@ -98,8 +100,18 @@ public class OrderServiceImpl implements OrderService {
         if (oldAsset == null) {
             assetService.createAsset(user,orderItem.getCoin(),orderItem.getQuantity());
         }else {
-            assetService.updateAsset(oldAsset.getId(), quantity);
+            // Recompute weighted-average cost basis on repeated buys.
+            assetService.updateAssetOnBuy(oldAsset.getId(), quantity, buyPrice);
         }
+
+        // Ledger: record the buy against the buyer's wallet.
+        transactionService.createTransaction(
+                wallet,
+                WalletTransactionType.BUY_ASSET,
+                LocalDateTime.now(),
+                null,
+                "Bought " + quantity + " of " + coin.getId(),
+                order.getPrice());
 
         return savedOrder;
     }
@@ -123,12 +135,25 @@ public class OrderServiceImpl implements OrderService {
             if (assetToSell.getQuantity().compareTo(quantity) >= 0) {
                 order.setOrderStatus(OrderStatus.SUCCESS);
                 Order savedOrder = orderRepository.save(order);
-                walletService.payOrderPayment(order, user);
+                Wallet wallet = walletService.payOrderPayment(order, user);
 
+                // Sell reduces quantity only; per-unit cost basis is unchanged.
                 Asset updatedAsset = assetService.updateAsset(assetToSell.getId(), quantity.negate());
-                if (updatedAsset.getQuantity().multiply(BigDecimal.valueOf(coin.getCurrentPrice())).compareTo(BigDecimal.ONE) <= 0) {
+                // Only remove the holding when the position is fully emptied (quantity <= 0),
+                // never based on dollar value. Small holdings are preserved.
+                if (updatedAsset.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
                     assetService.deleteAsset(updatedAsset.getId());
                 }
+
+                // Ledger: record the sell as a credit to the seller's wallet.
+                transactionService.createTransaction(
+                        wallet,
+                        WalletTransactionType.SELL_ASSET,
+                        LocalDateTime.now(),
+                        null,
+                        "Sold " + quantity + " of " + coin.getId(),
+                        order.getPrice());
+
                 return savedOrder;
             }
             throw new Exception("Insufficient quantity to sell");

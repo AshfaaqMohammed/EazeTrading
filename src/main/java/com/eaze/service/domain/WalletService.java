@@ -12,6 +12,8 @@ public interface WalletService {
 
     Wallet addBalance(Wallet wallet, BigDecimal money);
 
+    Wallet deposit(Wallet wallet, BigDecimal amount);
+
     Wallet findWalletById(Long id) throws Exception;
 
     Wallet walletToWalletTransfer(User sender, Wallet receiverWallet, BigDecimal amount) throws Exception;
