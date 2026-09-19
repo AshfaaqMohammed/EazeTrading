@@ -8,6 +8,13 @@ import java.util.List;
 
 public interface WithdrawalService {
 
+    /**
+     * Atomically: validate balance, create the withdrawal (PENDING), debit the
+     * wallet, and write the WITHDRAWAL ledger row — all in ONE transaction.
+     * Replaces the previous controller-side orchestration that had no transaction.
+     */
+    Withdrawal createWithdrawalRequest(BigDecimal amount, User user) throws Exception;
+
     Withdrawal requestWithdrawal(BigDecimal amount, User user);
 
     Withdrawal proceedWithdrawal(Long withdrawalId, boolean accept) throws Exception;

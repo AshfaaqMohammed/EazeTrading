@@ -9,9 +9,9 @@ import com.eaze.repository.OrderRepository;
 import com.eaze.service.domain.AssetService;
 import com.eaze.service.domain.OrderService;
 import com.eaze.service.domain.WalletService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -60,7 +60,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Order processOrder(Coin coin, BigDecimal quantity, OrderType orderType, User user) throws Exception {
         if (orderType.equals(OrderType.BUY)) {
             return buyAsset(coin, quantity, user);
@@ -80,8 +80,7 @@ public class OrderServiceImpl implements OrderService {
         return orderItemRepository.save(orderItem);
     }
 
-    @Transactional
-    protected Order buyAsset(Coin coin, BigDecimal quantity, User user) throws Exception {
+    private Order buyAsset(Coin coin, BigDecimal quantity, User user) throws Exception {
         if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
             throw new Exception("Quantity must not be 0 or <0");
         }
@@ -90,11 +89,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = createOrder(user, orderItem, OrderType.BUY);
         orderItem.setOrder(order);
 
-        Wallet wallet = walletService.payOrderPayment(order, user);
-        order.setOrderStatus(OrderStatus.SUCCESS);
-
-        Order savedOrder = orderRepository.save(order);
-
+        walletService.payOrderPayment(order, user);
         Asset oldAsset = assetService.findAssetByUserIdAndCoinId(order.getUser().getId(), order.getOrderItem().getCoin().getId());
 
         if (oldAsset == null) {
@@ -103,21 +98,10 @@ public class OrderServiceImpl implements OrderService {
             // Recompute weighted-average cost basis on repeated buys.
             assetService.updateAssetOnBuy(oldAsset.getId(), quantity, buyPrice);
         }
-
-        // Ledger: record the buy against the buyer's wallet.
-        transactionService.createTransaction(
-                wallet,
-                WalletTransactionType.BUY_ASSET,
-                LocalDateTime.now(),
-                null,
-                "Bought " + quantity + " of " + coin.getId(),
-                order.getPrice());
-
-        return savedOrder;
+        return order;
     }
 
-    @Transactional
-    protected Order sellAsset(Coin coin, BigDecimal quantity, User user) throws Exception {
+    private Order sellAsset(Coin coin, BigDecimal quantity, User user) throws Exception {
         if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
             throw new Exception("Quantity must not be 0 or <0");
         }
@@ -133,28 +117,12 @@ public class OrderServiceImpl implements OrderService {
             orderItem.setOrder(order);
 
             if (assetToSell.getQuantity().compareTo(quantity) >= 0) {
-                order.setOrderStatus(OrderStatus.SUCCESS);
-                Order savedOrder = orderRepository.save(order);
-                Wallet wallet = walletService.payOrderPayment(order, user);
-
-                // Sell reduces quantity only; per-unit cost basis is unchanged.
-                Asset updatedAsset = assetService.updateAsset(assetToSell.getId(), quantity.negate());
-                // Only remove the holding when the position is fully emptied (quantity <= 0),
-                // never based on dollar value. Small holdings are preserved.
-                if (updatedAsset.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
-                    assetService.deleteAsset(updatedAsset.getId());
+                walletService.payOrderPayment(order, user);
+                Asset updateAsset = assetService.updateAsset(assetToSell.getId(), quantity.negate());
+                if (updateAsset.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
+                    assetService.deleteAsset(updateAsset.getId());
                 }
-
-                // Ledger: record the sell as a credit to the seller's wallet.
-                transactionService.createTransaction(
-                        wallet,
-                        WalletTransactionType.SELL_ASSET,
-                        LocalDateTime.now(),
-                        null,
-                        "Sold " + quantity + " of " + coin.getId(),
-                        order.getPrice());
-
-                return savedOrder;
+                return order;
             }
             throw new Exception("Insufficient quantity to sell");
         }

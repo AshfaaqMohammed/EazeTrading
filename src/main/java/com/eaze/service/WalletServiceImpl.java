@@ -1,14 +1,17 @@
 package com.eaze.service;
 
+import com.eaze.domian.OrderStatus;
 import com.eaze.domian.OrderType;
 import com.eaze.domian.WalletTransactionType;
 import com.eaze.model.Order;
 import com.eaze.model.User;
 import com.eaze.model.Wallet;
+import com.eaze.repository.OrderRepository;
 import com.eaze.repository.WalletRepository;
 import com.eaze.service.domain.WalletService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,10 +23,12 @@ public class WalletServiceImpl implements WalletService {
 
     private final WalletRepository walletRepository;
     private final TransactionService transactionService;
+    private final OrderRepository orderRepository;
 
-    public WalletServiceImpl(WalletRepository walletRepository, TransactionService transactionService) {
+    public WalletServiceImpl(WalletRepository walletRepository, TransactionService transactionService, OrderRepository orderRepository) {
         this.walletRepository = walletRepository;
         this.transactionService = transactionService;
+        this.orderRepository = orderRepository;
     }
 
     @Override
@@ -117,20 +122,42 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Wallet payOrderPayment(Order order, User user) throws Exception {
+        // Only a PENDING order may be paid. Blocks double-charge / double-credit.
+        if (order.getOrderStatus() != OrderStatus.PENDING) {
+            throw new Exception("Order " + order.getId() + " is already "
+                    + order.getOrderStatus() + " and cannot be paid again");
+        }
         Wallet wallet = getUserWallet(user);
-
         BigDecimal newBalance;
+        WalletTransactionType ledgerType;
+        String purpose;
         if (order.getOrderType().equals(OrderType.BUY)) {
             newBalance = wallet.getBalance().subtract(order.getPrice());
             if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
                 throw new Exception("Insufficient funds for this transaction");
             }
-        }else{
+            ledgerType = WalletTransactionType.BUY_ASSET;
+            purpose = "Order payment (BUY) #"+order.getId();
+        } else {
             newBalance = wallet.getBalance().add(order.getPrice());
+            ledgerType = WalletTransactionType.SELL_ASSET;
+            purpose = "Order Payment(SELL) #"+order.getId();
         }
         wallet.setBalance(newBalance);
         walletRepository.save(wallet);
+
+        order.setOrderStatus(OrderStatus.SUCCESS);
+        orderRepository.save(order);
+
+        transactionService.createTransaction(
+                wallet,
+                ledgerType,
+                LocalDateTime.now(),
+                null,
+                purpose,
+                order.getPrice());
         return wallet;
     }
 }

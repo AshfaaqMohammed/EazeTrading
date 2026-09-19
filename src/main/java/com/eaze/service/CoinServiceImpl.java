@@ -25,6 +25,7 @@ import java.util.Optional;
 public class CoinServiceImpl implements CoinService {
 
     private final CoinRepository coinRepository;
+    private final RestTemplate restTemplate;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${coingecko.api.key:}")
@@ -36,8 +37,9 @@ public class CoinServiceImpl implements CoinService {
     @Value("${coingecko.api.header-name:}")
     private String headerName;
 
-    public CoinServiceImpl(CoinRepository coinRepository) {
+    public CoinServiceImpl(CoinRepository coinRepository, RestTemplate restTemplate) {
         this.coinRepository = coinRepository;
+        this.restTemplate = restTemplate;
     }
 
     private HttpEntity<String> createHttpEntity() {
@@ -50,8 +52,6 @@ public class CoinServiceImpl implements CoinService {
     public List<Coin> getCoinList(int page) throws Exception {
         validateCoinGeckoConfig();
         String url = baseUrl + "/coins/markets?vs_currency=usd&per_page=10&page=" + page;
-
-        RestTemplate restTemplate = new RestTemplate();
 
         try {
             HttpEntity<String> entity = createHttpEntity();
@@ -69,8 +69,6 @@ public class CoinServiceImpl implements CoinService {
         validateCoinGeckoConfig();
         String url = baseUrl + "/coins/" + coinId + "/market_chart?vs_currency=usd&days=" + days;
 
-        RestTemplate restTemplate = new RestTemplate();
-
         try {
             HttpEntity<String> entity = createHttpEntity();
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
@@ -84,8 +82,6 @@ public class CoinServiceImpl implements CoinService {
     public String getCoinDetails(String coinId) throws Exception {
         validateCoinGeckoConfig();
         String url = baseUrl + "/coins/" + coinId;
-
-        RestTemplate restTemplate = new RestTemplate();
 
         try {
             HttpEntity<String> entity = createHttpEntity();
@@ -147,8 +143,6 @@ public class CoinServiceImpl implements CoinService {
         validateCoinGeckoConfig();
         String url = baseUrl + "/search?query=" + keyWord;
 
-        RestTemplate restTemplate = new RestTemplate();
-
         try {
             HttpEntity<String> entity = createHttpEntity();
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
@@ -162,8 +156,6 @@ public class CoinServiceImpl implements CoinService {
     public String getTop50CoinsByMarketCapRank() throws Exception {
         validateCoinGeckoConfig();
         String url = baseUrl + "/coins/markets?vs_currency=usd&per_page=50&page=1";
-
-        RestTemplate restTemplate = new RestTemplate();
 
         try {
             HttpEntity<String> entity = createHttpEntity();
@@ -179,8 +171,6 @@ public class CoinServiceImpl implements CoinService {
     public String getTrendingCoins() throws Exception {
         validateCoinGeckoConfig();
         String url = baseUrl + "/search/trending";
-
-        RestTemplate restTemplate = new RestTemplate();
 
         try {
             HttpEntity<String> entity = createHttpEntity();

@@ -33,22 +33,7 @@ public class WithdrawalController {
                                               @RequestHeader("Authorization") String jwt) throws Exception {
 
         User user = userService.findUserProfileByJwt(jwt);
-        Wallet userWallet = walletService.getUserWallet(user);
-
-        if (userWallet.getBalance().compareTo(amount) < 0) {
-            throw new Exception("Insufficient balance for withdrawal");
-        }
-        Withdrawal withdrawal = withdrawalService.requestWithdrawal(amount, user);
-        walletService.addBalance(userWallet, withdrawal.getAmount().negate());// subtracting from the actual balance
-
-        transactionService.createTransaction(
-                userWallet,
-                WalletTransactionType.WITHDRAWAL,
-                LocalDateTime.now(),
-                null,
-                "bank account withdrawal",
-                withdrawal.getAmount());
-
+        Withdrawal withdrawal = withdrawalService.createWithdrawalRequest(amount, user);
         return new ResponseEntity<>(withdrawal, HttpStatus.OK);
     }
 
@@ -58,13 +43,6 @@ public class WithdrawalController {
                                                @RequestHeader("Authorization") String jwt) throws Exception {
 
         Withdrawal withdrawal = withdrawalService.proceedWithdrawal(id, accept);
-
-        // if declined, refund the amount to the withdrawal owner (not the admin acting on it).
-        if (!accept) {
-            Wallet ownerWallet = walletService.getUserWallet(withdrawal.getUser());
-            walletService.addBalance(ownerWallet, withdrawal.getAmount());
-        }
-
         return new ResponseEntity<>(withdrawal, HttpStatus.OK);
     }
 

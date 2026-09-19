@@ -50,6 +50,10 @@ public class WalletController {
             @PathVariable("orderId") Long orderId) throws Exception {
         User user = userService.findUserProfileByJwt(jwt);
         Order order = orderService.getOrderById(orderId);
+
+        if (order.getUser() == null || !order.getUser().getId().equals(user.getId())) {
+            throw new PaymentException("You don't have access to this order.", HttpStatus.FORBIDDEN);
+        }
         Wallet wallet = walletService.payOrderPayment(order, user);
 
         return new ResponseEntity<>(wallet, HttpStatus.ACCEPTED);
