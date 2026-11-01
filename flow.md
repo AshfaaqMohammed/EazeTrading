@@ -173,3 +173,123 @@ Sell coin (SELL_ASSET)─┤──► Wallet balance ─┬─► Buy coin (BUY_
   trade records. **WalletTransaction** = the history of every money movement.
 - Buying converts wallet cash → an Asset. Selling converts an Asset → wallet cash.
   Deposits/transfers/withdrawals move cash in and out.
+
+
+---
+
+# System Architecture (through Task 4 — hardening in progress)
+
+EazeTrading is being hardened from a raw starter into a production-grade,
+horizontally-scalable system. This section captures the architecture as of
+**Task 4 (Redis-backed idempotency)**. Tasks 1–4 are complete; Tasks 5–14
+(caching, resilience, RabbitMQ, outbox, distributed locks, observability,
+dockerization, deploy) are upcoming.
+
+## High-level request flow
+
+```mermaid
+flowchart TD
+    Client["Client<br/>(React FE / Postman)"]
+
+    subgraph App["Spring Boot app — 1 instance today, designed for N"]
+        direction TB
+        JwtFilter["JWT Auth Filter<br/>validates token"]
+        IdemFilter["Idempotency Filter (Task 4)<br/>guards 4 money endpoints<br/>replay / 409 / claim"]
+        Controllers["Controllers<br/>Order · Wallet · Withdrawal · Payment"]
+        subgraph Services["Service layer — Spring @Transactional"]
+            OrderSvc["OrderService<br/>optimistic retry loop"]
+            OrderTx["OrderTransactionalService<br/>buy/sell, fresh tx per attempt"]
+            WalletSvc["WalletService<br/>pessimistic wallet lock"]
+            WithdrawSvc["WithdrawalService<br/>atomic + status guard"]
+        end
+    end
+
+    MySQL[("MySQL 8<br/>Flyway-migrated · Hikari pool=20<br/>asset @Version · CHECK(balance>=0)")]
+    Redis[("Redis<br/>idempotency keys<br/>SET NX · TTL 24h")]
+    CoinGecko["CoinGecko API<br/>external price data"]
+
+    Client -->|"HTTP + JWT + Idempotency-Key"| JwtFilter
+    JwtFilter --> IdemFilter
+    IdemFilter -->|"replay (DONE) / 409 (IN_PROGRESS)"| Client
+    IdemFilter -->|"new key: claim then proceed"| Controllers
+    Controllers --> Services
+    OrderSvc --> OrderTx
+    OrderTx --> WalletSvc
+    Services -->|"SELECT ... FOR UPDATE · writes"| MySQL
+    IdemFilter <-->|"claim / replay"| Redis
+    Controllers -.->|"live prices"| CoinGecko
+```
+
+## Buy path — sequence (idempotency + locking together)
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant F as Idempotency Filter
+    participant R as Redis
+    participant O as OrderService (retry loop)
+    participant T as OrderTransactionalService (@Transactional)
+    participant W as WalletService
+    participant DB as MySQL
+
+    C->>F: POST /api/orders/pay (Idempotency-Key: K)
+    F->>R: SET NX idemp:user:...:K = IN_PROGRESS
+    alt key already DONE
+        R-->>F: stored response
+        F-->>C: replay (Idempotent-Replayed: true)
+    else new key
+        R-->>F: claimed
+        F->>O: processOrder()
+        O->>T: processOrderOnce()  (fresh tx)
+        T->>W: payOrderPayment()
+        W->>DB: SELECT wallet ... FOR UPDATE (pessimistic lock)
+        W->>DB: debit + order=SUCCESS + ledger row
+        DB-->>W: commit (CHECK balance>=0 enforced)
+        T-->>O: order
+        O-->>F: 200 + order body
+        F->>R: store DONE {200, body}
+        F-->>C: 200 + order body
+    end
+```
+
+## Layered safety model (defense in depth)
+
+```mermaid
+flowchart LR
+    A["1. Idempotency (Redis)<br/>stops duplicate REQUESTS"] -->
+    B["2. Transaction<br/>all-or-nothing writes"] -->
+    C["3a. Pessimistic lock<br/>serializes concurrent debits"] -->
+    D["3b. Optimistic @Version<br/>detects asset conflicts"] -->
+    E["3c. DB CHECK(balance>=0)<br/>last-line backstop"]
+```
+
+## What each task added
+
+| Task | Theme | Key mechanisms |
+|------|-------|----------------|
+| 1 | Foundation | Flyway migrations (schema-as-code), `ddl-auto=validate`, secrets externalized to env |
+| 2 | Transaction boundaries | Spring `@Transactional(rollbackFor=Exception.class)` on proxied entry points; self-invocation bug fixed; atomic withdrawal; ownership + status guards |
+| 3 | Concurrency control | Pessimistic `SELECT…FOR UPDATE` on the hot wallet row; optimistic `@Version` + bounded retry on assets; `CHECK(balance>=0)` backstop; deadlock-safe transfers (lock by ascending id); proven by a concurrent-buy integration test |
+| 4 | Idempotency | Redis client-generated `Idempotency-Key`; atomic `SET NX` claim; replay on retry; 409 on in-flight duplicate; cross-cutting filter; lenient/opt-in |
+
+## Infrastructure
+
+| Component | Role | Status |
+|-----------|------|--------|
+| MySQL 8 | System of record; locks + CHECK constraint; Flyway-migrated | active |
+| Redis (eaze-redis, 7-alpine) | Idempotency store (later: cache, locks) | active |
+| CoinGecko | External price data | not yet cached / resilient (Tasks 5–6) |
+| RabbitMQ | Async work (emails, outbox, withdrawals) | planned (Task 7+) |
+
+## Performance baseline (Task 3→4)
+
+Local "one server" (18 vCPU / 16 GB, WSL2), k6 mixed 70/30 read/write, ramp to 200 VUs:
+
+| Hikari pool | Throughput | p95 (overall) | Note |
+|-------------|-----------|---------------|------|
+| 10 (default) | ~40 req/s | 24.6 s | starved |
+| 20 (chosen) | ~86 req/s | 272 ms | sweet spot |
+| 50 | ~98 req/s | 443 ms | diminishing returns / worse p95 |
+
+Bottleneck: write-path wallet row-lock serialization, not connections. Re-run
+`loadtest/baseline.js` after each task to quantify improvement.

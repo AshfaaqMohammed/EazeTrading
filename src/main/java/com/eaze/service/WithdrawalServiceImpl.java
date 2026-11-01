@@ -31,7 +31,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new Exception("Withdrawal amount must be greater than 0");
         }
-        Wallet userWallet = walletService.getUserWallet(user);
+        Wallet userWallet = walletService.getUserWalletForUpdate(user);
         if (userWallet.getBalance().compareTo(amount) < 0) {
             throw new Exception("Insufficient balance for withdrawal");
         }

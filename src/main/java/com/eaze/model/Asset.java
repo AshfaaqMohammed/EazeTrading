@@ -16,6 +16,9 @@ public class Asset {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
+    @Version
+    private Long version;
+
     private BigDecimal quantity;
     private BigDecimal buyPrice;
 

@@ -1,10 +1,12 @@
 package com.eaze.service;
 
+import com.eaze.domian.OrderStatus;
 import com.eaze.domian.OrderType;
 import com.eaze.domian.WalletTransactionType;
 import com.eaze.model.Order;
 import com.eaze.model.User;
 import com.eaze.model.Wallet;
+import com.eaze.repository.OrderRepository;
 import com.eaze.repository.WalletRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -24,10 +27,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class WalletServiceImplTest {
 
-    @Mock
-    private WalletRepository walletRepository;
-    @Mock
-    private TransactionService transactionService;
+    @Mock private WalletRepository walletRepository;
+    @Mock private TransactionService transactionService;
+    @Mock private OrderRepository orderRepository;   // NEW dependency after Task 2
 
     @InjectMocks
     private WalletServiceImpl walletService;
@@ -51,7 +53,7 @@ class WalletServiceImplTest {
         return w;
     }
 
-    // ---------- getUserWallet ----------
+    // ---------- getUserWallet (unchanged behavior) ----------
 
     @Test
     void getUserWallet_returnsExisting_whenFound() {
@@ -80,8 +82,6 @@ class WalletServiceImplTest {
     @Test
     void getUserWallet_raceSafe_reFetchesOnDuplicateInsert() {
         Wallet existing = walletWith(10L, 1L, BigDecimal.ZERO);
-        // First lookup: null (no wallet yet). Save fails (another request created it).
-        // Second lookup (in catch): returns the now-existing wallet.
         when(walletRepository.findByUserId(1L)).thenReturn(null).thenReturn(existing);
         when(walletRepository.saveAndFlush(any(Wallet.class)))
                 .thenThrow(new DataIntegrityViolationException("duplicate"));
@@ -92,13 +92,17 @@ class WalletServiceImplTest {
         verify(walletRepository, times(2)).findByUserId(1L);
     }
 
-    // ---------- walletToWalletTransfer ----------
+    // ---------- walletToWalletTransfer (now locks both wallets by id) ----------
 
     @Test
     void transfer_movesFunds_andWritesTwoLedgerRows() throws Exception {
         Wallet sender = walletWith(1L, 1L, new BigDecimal("1000"));
         Wallet receiver = walletWith(2L, 2L, new BigDecimal("100"));
+        // Sender resolved from user (unlocked, only for its id) ...
         when(walletRepository.findByUserId(1L)).thenReturn(sender);
+        // ... then BOTH wallets are re-fetched with the id-locking finder (ascending id order).
+        when(walletRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sender));
+        when(walletRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(receiver));
         when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
 
         walletService.walletToWalletTransfer(user, receiver, new BigDecimal("300"));
@@ -106,7 +110,6 @@ class WalletServiceImplTest {
         assertEquals(0, new BigDecimal("700").compareTo(sender.getBalance()));
         assertEquals(0, new BigDecimal("400").compareTo(receiver.getBalance()));
 
-        // Two ledger rows, both WALLET_TRANSFER, correlated by a shared transferId.
         ArgumentCaptor<String> transferId = ArgumentCaptor.forClass(String.class);
         verify(transactionService, times(2)).createTransaction(
                 any(Wallet.class), eq(WalletTransactionType.WALLET_TRANSFER), any(),
@@ -120,6 +123,8 @@ class WalletServiceImplTest {
         Wallet sender = walletWith(1L, 1L, new BigDecimal("100"));
         Wallet receiver = walletWith(2L, 2L, BigDecimal.ZERO);
         when(walletRepository.findByUserId(1L)).thenReturn(sender);
+        when(walletRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sender));
+        when(walletRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(receiver));
 
         Exception ex = assertThrows(Exception.class,
                 () -> walletService.walletToWalletTransfer(user, receiver, new BigDecimal("500")));
@@ -129,30 +134,36 @@ class WalletServiceImplTest {
         verify(transactionService, never()).createTransaction(any(), any(), any(), any(), any(), any());
     }
 
-    // ---------- payOrderPayment ----------
+    // ---------- payOrderPayment (now status-guarded + locking finder + sets SUCCESS + ledger) ----------
 
     @Test
     void payOrderPayment_buy_subtractsPrice() throws Exception {
         Wallet wallet = walletWith(1L, 1L, new BigDecimal("1000"));
-        when(walletRepository.findByUserId(1L)).thenReturn(wallet);
+        // getUserWalletForUpdate -> findByUserIdForUpdate (the locked read)
+        when(walletRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(wallet));
         when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Order order = new Order();
+        order.setId(1L);
         order.setOrderType(OrderType.BUY);
+        order.setOrderStatus(OrderStatus.PENDING);   // status guard requires PENDING
         order.setPrice(new BigDecimal("250"));
 
         Wallet result = walletService.payOrderPayment(order, user);
 
         assertEquals(0, new BigDecimal("750").compareTo(result.getBalance()));
+        assertEquals(OrderStatus.SUCCESS, order.getOrderStatus());  // now flips to SUCCESS
     }
 
     @Test
     void payOrderPayment_buy_rejects_whenInsufficientFunds() {
         Wallet wallet = walletWith(1L, 1L, new BigDecimal("100"));
-        when(walletRepository.findByUserId(1L)).thenReturn(wallet);
+        when(walletRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(wallet));
 
         Order order = new Order();
+        order.setId(1L);
         order.setOrderType(OrderType.BUY);
+        order.setOrderStatus(OrderStatus.PENDING);
         order.setPrice(new BigDecimal("500"));
 
         assertThrows(Exception.class, () -> walletService.payOrderPayment(order, user));
@@ -161,11 +172,13 @@ class WalletServiceImplTest {
     @Test
     void payOrderPayment_sell_addsPrice() throws Exception {
         Wallet wallet = walletWith(1L, 1L, new BigDecimal("100"));
-        when(walletRepository.findByUserId(1L)).thenReturn(wallet);
+        when(walletRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(wallet));
         when(walletRepository.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Order order = new Order();
+        order.setId(1L);
         order.setOrderType(OrderType.SELL);
+        order.setOrderStatus(OrderStatus.PENDING);
         order.setPrice(new BigDecimal("300"));
 
         Wallet result = walletService.payOrderPayment(order, user);
@@ -173,7 +186,7 @@ class WalletServiceImplTest {
         assertEquals(0, new BigDecimal("400").compareTo(result.getBalance()));
     }
 
-    // ---------- deposit ----------
+    // ---------- deposit (unchanged) ----------
 
     @Test
     void deposit_creditsBalance_andLogsAddMoney() {

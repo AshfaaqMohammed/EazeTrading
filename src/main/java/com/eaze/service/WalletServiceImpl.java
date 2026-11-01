@@ -89,17 +89,40 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Wallet walletToWalletTransfer(User sender, Wallet receiverWallet, BigDecimal amount) throws Exception {
-        Wallet senderWallet = walletRepository.findByUserId(sender.getId());
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <=0 ) {
+            throw new Exception("Transfer amount must be greater than 0");
+        }
+        Wallet senderWalletUnlocked = walletRepository.findByUserId(sender.getId());
+        if (senderWalletUnlocked == null) {
+            throw new Exception("Sender wallet not found");
+        }
+        Long senderWalletId = senderWalletUnlocked.getId();
+        Long receiverWalletId = receiverWallet.getId();
 
+        if (senderWalletId.equals(receiverWalletId)) {
+            throw new Exception("Cannot transfer to your own wallet");
+        }
+        // DEADLOCK AVOIDANCE: always acquire the two row locks in a globally consistent
+        // order (ascending wallet id), regardless of who is sender/receiver. This removes
+        // the circular-wait condition, so two opposite-direction transfers can never deadlock.
+        Long firstId = Math.min(senderWalletId, receiverWalletId);
+        Long secondId = Math.max(senderWalletId, receiverWalletId);
+
+        Wallet firstLocked = walletRepository.findByIdForUpdate(firstId)
+                .orElseThrow(() -> new Exception("Wallet not found: " + firstId));
+        Wallet secondLocked = walletRepository.findByIdForUpdate(secondId)
+                .orElseThrow(() -> new Exception("Wallet not found: " + secondId));
+        Wallet senderWallet = senderWalletId.equals(firstId) ? firstLocked : secondLocked;
+        Wallet receiver = receiverWalletId.equals(firstId) ? firstLocked : secondLocked;
         if (senderWallet.getBalance().compareTo(amount) < 0) {
             throw new Exception("Insufficient balance");
         }
-        BigDecimal senderBalance = senderWallet.getBalance().subtract(amount);
-        senderWallet.setBalance(senderBalance);
+        senderWallet.setBalance(senderWallet.getBalance().subtract(amount));
+        receiver.setBalance(receiver.getBalance().add(amount));
         walletRepository.save(senderWallet);
-
-        addBalance(receiverWallet, amount);
+        walletRepository.save(receiver);
 
         // Ledger: two correlated records (sender debit + receiver credit).
         String transferId = UUID.randomUUID().toString();
@@ -108,10 +131,10 @@ public class WalletServiceImpl implements WalletService {
                 WalletTransactionType.WALLET_TRANSFER,
                 LocalDateTime.now(),
                 transferId,
-                "Transfer to wallet id " + receiverWallet.getId(),
+                "Transfer to wallet id " + receiver.getId(),
                 amount);
         transactionService.createTransaction(
-                receiverWallet,
+                receiver,
                 WalletTransactionType.WALLET_TRANSFER,
                 LocalDateTime.now(),
                 transferId,
@@ -129,7 +152,7 @@ public class WalletServiceImpl implements WalletService {
             throw new Exception("Order " + order.getId() + " is already "
                     + order.getOrderStatus() + " and cannot be paid again");
         }
-        Wallet wallet = getUserWallet(user);
+        Wallet wallet = getUserWalletForUpdate(user);
         BigDecimal newBalance;
         WalletTransactionType ledgerType;
         String purpose;
@@ -159,5 +182,12 @@ public class WalletServiceImpl implements WalletService {
                 purpose,
                 order.getPrice());
         return wallet;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Wallet getUserWalletForUpdate(User user) throws Exception {
+        return walletRepository.findByUserIdForUpdate(user.getId())
+                .orElseThrow(() -> new Exception("Wallet not found for user " + user.getId()));
     }
 }
